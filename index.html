@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QASEM FOR SUPERMARKET SYSTEMS</title>
+
+  <!-- خط عربي جيد -->
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;800&display=swap" rel="stylesheet">
+  
+  <!-- أيقونات -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- html2pdf (لتصدير PDF) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- مكتبة SheetJS (لتصدير Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="loginScreen" class="login-screen">
+    <div class="login-form">
+      <h2>تسجيل الدخول</h2>
+      <div class="form-group">
+        <label for="username">اسم المستخدم</label>
+        <input type="text" id="username" placeholder="أدخل اسم المستخدم">
+      </div>
+      <div class="form-group">
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" placeholder="أدخل كلمة المرور">
+      </div>
+      <button onclick="login()" style="width:100%">تسجيل الدخول</button>
+    </div>
+  </div>
+
+  <div id="app" style="display:none">
+    <header>
+      <h1>QASEM FOR SUPERMARKET SYSTEMS</h1>
+      <div>مرحباً, <span id="currentUser">مدير النظام</span> | <a href="#" onclick="logout()" style="color:white">تسجيل خروج</a></div>
+    </header>
+
+    <div class="container">
+      <nav>
+        <button class="tab active" data-target="#dashboard">لوحة التحكم</button>
+        <button class="tab" data-target="#items">الأصناف</button>
+        <button class="tab" data-target="#customers">العملاء</button>
+        <button class="tab" data-target="#invoices">الفواتير</button>
+        <button class="tab" data-target="#unpostInvoices">إلغاء الترحيل</button>
+        <button class="tab" data-target="#reports">التقارير</button>
+        <button class="tab" data-target="#settings">الإعدادات</button>
+      </nav>
+
+      <div id="dashboard" class="view active">
+        <div class="stats-container">
+          <div class="stat-card">
+            <div class="stat-label">عدد الأصناف</div>
+            <div id="statItems" class="stat-value">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">عدد العملاء</div>
+            <div id="statCustomers" class="stat-value">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">عدد الفواتير</div>
+            <div id="statInvoices" class="stat-value">0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">إحصائيات سريعة</div>
+          <div id="quickStats"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">آخر الحركات</div>
+          <div id="recentActivities"></div>
+        </div>
+      </div>
+
+      <div id="items" class="view">
+        <div class="card">
+          <div class="card-title">إضافة صنف جديد</div>
+          <div class="form-group">
+            <label for="itemName">اسم الصنف</label>
+            <input type="text" id="itemName" placeholder="أدخل اسم الصنف">
+          </div>
+          <div class="form-group">
+            <label for="itemUnit">الوحدة</label>
+            <select id="itemUnit">
+              <option value="كيس">كيس</option>
+              <option value="قطمه">قطمة</option>
+              <option value="نص">نص</option>
+              <option value="كرتون">كرتون</option>
+              <option value="علبة">علبة</option>
+              <option value="حبة">حبة</option>
+              <option value="باكت">باكت</option>
+              <option value="كيلو">كيلو</option>
+              <option value="لتر">لتر</option>
+              <option value="شدة">شدة</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="purchasePrice">سعر الشراء</label>
+            <input type="number" id="purchasePrice" placeholder="أدخل سعر الشراء" oninput="calculateProfit()">
+          </div>
+          <div class="form-group">
+            <label for="itemPrice">سعر البيع</label>
+            <input type="number" id="itemPrice" placeholder="أدخل سعر البيع" oninput="calculateProfit()">
+          </div>
+          <div class="form-group">
+            <label for="profit">الربح</label>
+            <input type="number" id="profit" placeholder="الربح التلقائي" readonly>
+          </div>
+          <div class="form-group">
+            <label for="stockQuantity">الكمية في المخزن</label>
+            <input type="number" id="stockQuantity" placeholder="أدخل الكمية">
+            <div id="stockAlert" class="stock-alert" style="display: none;">الكمية نفذت</div>
+          </div>
+          <button id="saveItemBtn" onclick="handleSaveItem()">حفظ الصنف</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">قائمة الأصناف</div>
+          <table>
+            <thead>
+              <tr>
+                <th width="50">#</th>
+                <th>اسم الصنف</th>
+                <th>الوحدة</th>
+                <th>سعر الشراء</th>
+                <th>سعر البيع</th>
+                <th>الربح</th>
+                <th>المخزن</th>
+                <th width="150">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="itemsTableBody">
+              <tr><td colspan="8" style="text-align:center">لا توجد أصناف</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="customers" class="view">
+        <div class="card">
+          <div class="card-title">إضافة عميل جديد</div>
+          <div class="form-group">
+            <label for="customerName">اسم العميل</label>
+            <input type="text" id="customerName" placeholder="أدخل اسم العميل">
+          </div>
+          <div class="form-group">
+            <label for="customerCountryCode">رمز الدولة</label>
+            <select id="customerCountryCode">
+              <option value="+967">اليمن +967</option>
+              <option value="+966">السعودية +966</option>
+              <option value="+971">الإمارات +971</option>
+              <option value="+973">البحرين +973</option>
+              <option value="+968">عمان +968</option>
+              <option value="+974">قطر +974</option>
+              <option value="+965">الكويت +965</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="customerPhone">رقم الهاتف</label>
+            <input type="text" id="customerPhone" placeholder="أدخل رقم الهاتف">
+          </div>
+          <div class="form-group">
+            <label for="customerCurrency">العملة</label>
+            <select id="customerCurrency">
+              <option value="YER">ريال يمني (YER)</option>
+              <option value="SAR">ريال سعودي (SAR)</option>
+              <option value="USD">دولار أمريكي (USD)</option>
+            </select>
+          </div>
+          <button onclick="handleAddCustomer()">إضافة عميل</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">قائمة العملاء</div>
+          <table id="customersTable">
+            <thead>
+              <tr>
+                <th width="50">#</th>
+                <th>اسم العميل</th>
+                <th>رقم الهاتف</th>
+                <th>العملة</th>
+                <th>الرصيد</th>
+                <th width="250">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="customersTableBody">
+              <tr><td colspan="6" style="text-align:center">لا توجد عملاء</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="customerLedgerSection" style="display:none">
+        <div class="card">
+          <div class="card-title">كشف حساب العميل: <span id="ledgerCustomerName"></span></div>
+          
+          <div id="balanceDisplay" class="balance-display"></div>
+          
+          <div class="ledger-tabs">
+            <button class="ledger-btn statement active" onclick="showLedgerTab('ledger')">كشف الحساب</button>
+            <button class="ledger-btn receipt" onclick="showLedgerTab('receipt')">سند قبض</button>
+            <button class="ledger-btn payment" onclick="showLedgerTab('payment')">سند صرف</button>
+          </div>
+          
+          <div class="currency-tabs">
+            <button class="currency-tab active" data-currency="ALL" onclick="filterLedgerByCurrency('ALL')">جميع العملات</button>
+            <button class="currency-tab" data-currency="YER" onclick="filterLedgerByCurrency('YER')">YER</button>
+            <button class="currency-tab" data-currency="SAR" onclick="filterLedgerByCurrency('SAR')">SAR</button>
+            <button class="currency-tab" data-currency="USD" onclick="filterLedgerByCurrency('USD')">USD</button>
+          </div>
+          
+          <div class="filters">
+            <div class="form-group">
+              <label>من تاريخ</label>
+              <input type="date" id="ledgerFromDate" onchange="filterLedger()">
+            </div>
+            <div class="form-group">
+              <label>إلى تاريخ</label>
+              <input type="date" id="ledgerToDate" onchange="filterLedger()">
+            </div>
+            <div class="form-group">
+              <label>نوع الحركة</label>
+              <select id="ledgerTypeFilter" onchange="filterLedger()">
+                <option value="ALL">جميع الأنواع</option>
+                <option value="فاتورة">فواتير</option>
+                <option value="سند قبض">سندات قبض</option>
+                <option value="سند صرف">سندات صرف</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>بحث</label>
+              <input type="text" id="ledgerSearch" placeholder="ابحث في الوصف..." oninput="filterLedger()">
+            </div>
+          </div>
+          
+          <button onclick="exportLedgerCSV()" class="small">تصدير إلى Excel</button>
+          <button onclick="exportLedgerPDF()" class="small">تصدير إلى PDF</button>
+          
+          <div id="ledgerTab">
+            <table>
+              <thead>
+                <tr>
+                  <th>التاريخ</th>
+                  <th>النوع</th>
+                  <th>الوصف</th>
+                  <th>العملة</th>
+                  <th>مدين</th>
+                  <th>دائن</th>
+                  <th>الرصيد</th>
+                  <th>رقم الفاتورة</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="ledgerTableBody">
+                <tr><td colspan="9" style="text-align:center">لا توجد حركات</td></tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div id="receiptTab" style="display:none">
+            <div class="card">
+              <div class="card-title">سند قبض</div>
+              <div class="form-group">
+                <label for="receiptAmount">المبلغ</label>
+                <input type="number" id="receiptAmount" placeholder="أدخل المبلغ">
+              </div>
+              <div class="form-group">
+                <label for="receiptNotes">الوصف</label>
+                <textarea id="receiptNotes" placeholder="وصف الحركة"></textarea>
+              </div>
+              <button onclick="addReceipt()">إضافة سند قبض</button>
+            </div>
+          </div>
+          
+          <div id="paymentTab" style="display:none">
+            <div class="card">
+              <div class="card-title">سند صرف</div>
+              <div class="form-group">
+                <label for="paymentAmount">المبلغ</label>
+                <input type="number" id="paymentAmount" placeholder="أدخل المبلغ">
+              </div>
+              <div class="form-group">
+                <label for="paymentNotes">الوصف</label>
+                <textarea id="paymentNotes" placeholder="وصف الحركة"></textarea>
+              </div>
+              <button onclick="addPayment()">إضافة سند صرف</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="invoices" class="view">
+        <div class="card">
+          <div class="card-title">إنشاء فاتورة جديدة</div>
+          
+          <div class="form-group">
+            <label for="invoiceCustomer">العميل</label>
+            <select id="invoiceCustomer" onchange="updateCustomerBalance()">
+              <option value="">-- اختر العميل --</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="itemSearch">بحث عن الصنف</label>
+            <div class="search-container">
+              <input type="text" id="itemSearch" placeholder="ابدأ بكتابة اسم الصنف..." oninput="filterItems()">
+              <div id="itemSearchResults" class="search-results"></div>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label for="invoiceQty">الكمية</label>
+              <input type="number" id="invoiceQty" value="1" min="1">
+            </div>
+            <div class="form-group">
+              <label for="invoiceUnit">الوحدة</label>
+              <input type="text" id="invoiceUnit" readonly>
+            </div>
+            <div class="form-group">
+              <label for="invoiceUnitPrice">سعر الوحدة</label>
+              <input type="number" id="invoiceUnitPrice">
+            </div>
+          </div>
+          
+          <button onclick="handleAddInvoiceItem()">إضافة إلى الفاتورة</button>
+          
+          <div class="payment-methods" style="margin-top: 20px;">
+            <div class="payment-method active" data-method="نقدي" onclick="selectPaymentMethod('نقدي')">نقدي</div>
+            <div class="payment-method" data-method="آجل" onclick="selectPaymentMethod('آجل')">آجل</div>
+          </div>
+          
+          <div id="paidAmountContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+            <div class="form-group">
+              <label for="paidAmount">المبلغ المدفوع</label>
+              <input type="number" id="paidAmount" placeholder="المبلغ المدفوع" oninput="recalcCurrentInvoice()">
+            </div>
+          </div>
+          
+          <div class="invoice-status" style="margin-top: 20px;">
+            <div class="invoice-status-btn active" data-status="suspended" onclick="selectInvoiceStatus('suspended')">معلق</div>
+            <div class="invoice-status-btn" data-status="non-final" onclick="selectInvoiceStatus('non-final')">غير نهائي</div>
+            <div class="invoice-status-btn" data-status="final" onclick="selectInvoiceStatus('final')">نهائي</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">أصناف الفاتورة</div>
+          <table>
+            <thead>
+              <tr>
+                <th width="50">#</th>
+                <th colspan="2">اسم الصنف</th>
+                <th width="80">الكمية</th>
+                <th width="80">الوحدة</th>
+                <th width="100">سعر الوحدة</th>
+                <th width="120">الإجمالي</th>
+                <th width="150" colspan="2">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceItemsTableBody">
+              <tr><td colspan="9" style="text-align:center">لا توجد أصناف في الفاتورة</td></tr>
+            </tbody>
+          </table>
+          
+          <div id="invoiceSummary" style="display: none;">
+            <div class="invoice-summary">
+              <div class="invoice-summary-row">
+                <div class="invoice-summary-label">إجمالي الفاتورة:</div>
+                <div class="invoice-summary-value"><span id="invoiceTotalAmount">0</span> <span id="invoiceCurrency"></span></div>
+              </div>
+              <div class="invoice-summary-row">
+                <div class="invoice-summary-label">المبلغ المدفوع:</div>
+                <div class="invoice-summary-value"><span id="invoicePaidAmount">0</span> <span id="invoiceCurrency2"></span></div>
+              </div>
+              <div class="invoice-summary-row">
+                <div class="invoice-summary-label">المبلغ المتبقي:</div>
+                <div class="invoice-summary-value"><span id="invoiceRemainingAmount">0</span> <span id="invoiceCurrency3"></span></div>
+              </div>
+              <div class="invoice-summary-row">
+                <div class="invoice-summary-label">رصيد العميل الحالي:</div>
+                <div class="invoice-summary-value"><span id="invoiceCustomerBalance">0</span> <span id="invoiceCurrency4"></span></div>
+              </div>
+            </div>
+            
+            <button onclick="saveInvoice()" class="success" style="width:100%; margin-top:15px; padding:15px">حفظ الفاتورة</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">الفواتير المسجلة</div>
+          
+          <div class="filters">
+            <div class="form-group">
+              <label for="invoiceCustomerFilter">العميل</label>
+              <select id="invoiceCustomerFilter" onchange="filterInvoices()">
+                <option value="">جميع العملاء</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="invoiceFromDate">من تاريخ</label>
+              <input type="date" id="invoiceFromDate" onchange="filterInvoices()">
+            </div>
+            <div class="form-group">
+              <label for="invoiceToDate">إلى تاريخ</label>
+              <input type="date" id="invoiceToDate" onchange="filterInvoices()">
+            </div>
+            <div class="form-group">
+              <label for="invoiceStatusFilter">الحالة</label>
+              <select id="invoiceStatusFilter" onchange="filterInvoices()">
+                <option value="">جميع الحالات</option>
+                <option value="suspended">معلق</option>
+                <option value="non-final">غير نهائي</option>
+                <option value="final">نهائي</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="invoicePaymentFilter">طريقة الدفع</label>
+              <select id="invoicePaymentFilter" onchange="filterInvoices()">
+                <option value="">جميع الطرق</option>
+                <option value="نقدي">نقدي</option>
+                <option value="آجل">آجل</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="invoiceCurrencyFilter">العملة</label>
+              <select id="invoiceCurrencyFilter" onchange="filterInvoices()">
+                <option value="">جميع العملات</option>
+                <option value="YER">YER</option>
+                <option value="SAR">SAR</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+          </div>
+          
+          <button onclick="exportInvoicesCSV()" class="small">تصدير إلى Excel</button>
+          <button onclick="exportInvoicesPDF()" class="small">تصدير إلى PDF</button>
+          
+          <table>
+            <thead>
+              <tr>
+                <th width="50">#</th>
+                <th width="100">رقم الفاتورة</th>
+                <th width="150">التاريخ</th>
+                <th>العميل</th>
+                <th width="100">طريقة الدفع</th>
+                <th width="100">الحالة</th>
+                <th width="80">العملة</th>
+                <th width="120">الإجمالي</th>
+                <th width="200">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="invoicesTableBody">
+              <tr><td colspan="9" style="text-align:center">لا توجد فواتير</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="unpostInvoices" class="view">
+        <div class="card">
+          <div class="card-title">الفواتير النهائية (يمكن إلغاء ترحيلها)</div>
+          <table id="finalInvoicesTable">
+            <thead>
+              <tr>
+                <th width="50">#</th>
+                <th width="100">رقم الفاتورة</th>
+                <th width="150">التاريخ</th>
+                <th>العميل</th>
+                <th width="100">طريقة الدفع</th>
+                <th width="100">الحالة</th>
+                <th width="120">الإجمالي</th>
+                <th width="150">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="finalInvoicesTableBody">
+              <tr><td colspan="8" style="text-align:center">لا توجد فواتير نهائية</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="printArea" style="display:none">
+        <div class="card">
+          <div class="card-title">معاينة الفاتورة للطباعة</div>
+          
+          <div class="form-group">
+            <label for="paperSize">مقاس الورق</label>
+            <select id="paperSize">
+              <option value="80mm">80mm (إيصال)</option>
+              <option value="a4">A4</option>
+            </select>
+          </div>
+          
+          <button onclick="printOrExport()">طباعة / تصدير PDF</button>
+          <button onclick="hidePrintArea()">إلغاء</button>
+          
+          <div id="invoicePaper" class="paper paper-80mm">
+            <div class="paper-header">
+              <h2 id="paperStoreName">QASEM FOR SUPERMARKET SYSTEMS</h2>
+              <div id="paperStorePhone">تواصل: 733239920</div>
+            </div>
+            
+            <div class="paper-meta">
+              <div>فاتورة مبيعات رقم: <span id="paperInvoiceNumber"></span></div>
+              <div id="paperMeta"></div>
+            </div>
+            
+            <table>
+              <thead>
+                <tr>
+                  <th width="30">#</th>
+                  <th>الصنف</th>
+                  <th width="50">الكمية</th>
+                  <th width="50">الوحدة</th>
+                  <th width="70">السعر</th>
+                  <th width="80">الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody id="paperLines"></tbody>
+            </table>
+            
+            <div class="paper-footer">
+              <div class="invoice-summary">
+                <div class="invoice-summary-row">
+                  <div class="invoice-summary-label">الإجمالي:</div>
+                  <div class="invoice-summary-value"><span id="paperTotal"></span></div>
+                </div>
+                <div class="invoice-summary-row">
+                  <div class="invoice-summary-label">المدفوع:</div>
+                  <div class="invoice-summary-value"><span id="paperPaid"></span></div>
+                </div>
+                <div class="invoice-summary-row">
+                  <div class="invoice-summary-label">المتبقي:</div>
+                  <div class="invoice-summary-value"><span id="paperRemaining"></span></div>
+                </div>
+                <div class="invoice-summary-row">
+                  <div class="invoice-summary-label">رصيد العميل:</div>
+                  <div class="invoice-summary-value"><span id="paperCustomerBalance"></span></div>
+                </div>
+              </div>
+              
+              <div class="paper-qr" id="paperQrCode"></div>
+              
+              <div style="text-align:center; margin-top:15px">
+                <div>شكراً لتعاملكم معنا</div>
+                <div>للاستفسار: 733239920</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="reports" class="view">
+        <div class="card">
+          <div class="card-title">التقارير</div>
+          <div class="filters">
+            <div class="form-group">
+              <label for="reportType">نوع التقرير</label>
+              <select id="reportType">
+                <option value="sales">تقارير المبيعات</option>
+                <option value="inventory">تقارير المخزون</option>
+                <option value="customers">تقارير العملاء</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="reportFromDate">من تاريخ</label>
+              <input type="date" id="reportFromDate">
+            </div>
+            <div class="form-group">
+              <label for="reportToDate">إلى تاريخ</label>
+              <input type="date" id="reportToDate">
+            </div>
+          </div>
+          <button onclick="generateReport()">إنشاء التقرير</button>
+          <button onclick="exportReport()">تصدير التقرير</button>
+          
+          <div id="reportResults" style="margin-top: 20px;">
+            <p>سيظهر التقرير هنا بعد إنشائه</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="settings" class="view">
+        <div class="card">
+          <div class="card-title">إعدادات المتجر</div>
+          <div class="form-group">
+            <label for="storeName">اسم المتجر</label>
+            <input type="text" id="storeName" placeholder="أدخل اسم المتجر">
+          </div>
+          <div class="form-group">
+            <label for="storePhone">هاتف المتجر</label>
+            <input type="text" id="storePhone" placeholder="أدخل هاتف المتجر">
+          </div>
+          <button onclick="saveStore()">حفظ بيانات المتجر</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">الاشتراك</div>
+          <div class="form-group">
+            <label for="planType">نوع الخطة</label>
+            <select id="planType">
+              <option value="free">مجاني (حد 100 عميل)</option>
+              <option value="pro">Pro (غير محدود)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="planPrice">سعر الخطة</label>
+            <input type="number" id="planPrice" placeholder="السعر">
+          </div>
+          <button onclick="savePlan()">حفظ الخطة</button>
+          <button onclick="openSubscribe()">الاشتراك الآن</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">تغيير كلمة المرور</div>
+          <div class="form-group">
+            <label for="currentPassword">كلمة المرور الحالية</label>
+            <input type="password" id="currentPassword" placeholder="أدخل كلمة المرور الحالية">
+          </div>
+          <div class="form-group">
+            <label for="newPassword">كلمة المرور الجديدة</label>
+            <input type="password" id="newPassword" placeholder="أدخل كلمة المرور الجديدة">
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">تأكيد كلمة المرور</label>
+            <input type="password" id="confirmPassword" placeholder="أكد كلمة المرور الجديدة">
+          </div>
+          <button onclick="changePassword()">تغيير كلمة المرور</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">نسخ احتياطي / استعادة</div>
+          <button onclick="exportData()">تصدير البيانات</button>
+          <button onclick="importData()">استيراد البيانات</button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+      </div>
+    </div>
+
+    <div id="subscribeDialog" class="subscribe-dialog">
+      <div class="subscribe-content">
+        <h2>ترقية إلى الإصدار Pro</h2>
+        <p>للترقية إلى الإصدار Pro يرجى التواصل على الواتساب:</p>
+        <p style="text-align:center; font-weight:bold; margin:15px 0">
+          <a href="https://wa.me/967733239920" id="waSubscribeLink" style="color: #25D366; text-decoration: none;">
+            <i class="fab fa-whatsapp"></i> 733239920
+          </a>
+        </p>
+        <p>أو الاتصال على الرقم:</p>
+        <p style="text-align:center; font-weight:bold; margin:15px 0">
+          <a href="tel:733239920" style="color: #3498db; text-decoration: none;">
+            <i class="fas fa-phone"></i> 733239920
+          </a>
+        </p>
+        <button onclick="closeSubscribe()">إغلاق</button>
+      </div>
+    </div>
+
+    <footer style="text-align:center; padding:20px; color:#7f8c8d">
+      <div>QASEM FOR SUPERMARKET SYSTEMS © <span id="year"></span></div>
+      <div>رقم الدعم: <a href="tel:733239920" style="color: #7f8c8d;">733239920</a></div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
